@@ -8,7 +8,9 @@
 
 ## 📹 使用教程
 
-<iframe src="//player.bilibili.com/player.html?isOutside=true&aid=113463657499928&bvid=BV1K7mUYkEm6&cid=26712934758&p=1" scrolling="no" border="0" frameborder="no" framespacing="0" allowfullscreen="true"></iframe>
+点下边 ↓
+
+[【Blender手柄控制插件】游戏手柄秒变生产力工具~](https://www.bilibili.com/video/BV1K7mUYkEm6/?share_source=copy_web&vd_source=703633cfd930156a4be8ec371b4bb1e6)
 
 ## ✨ 功能特性
 
@@ -36,7 +38,7 @@
 
 ### Step 1: 安装inputs包
 
-首先需要在Blender的Python环境中安装inputs包。根据操作系统不同，有不同的安装方法：
+首先需要在Blender的Python环境中安装inputs包。安装方法如下：
 
 #### Windows系统：
 
