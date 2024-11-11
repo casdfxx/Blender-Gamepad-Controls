@@ -8,7 +8,7 @@
 
 ## 📹 使用教程
 
-【尚未完成...】
+<iframe src="//player.bilibili.com/player.html?isOutside=true&aid=113463657499928&bvid=BV1K7mUYkEm6&cid=26712934758&p=1" scrolling="no" border="0" frameborder="no" framespacing="0" allowfullscreen="true"></iframe>
 
 ## ✨ 功能特性
 
