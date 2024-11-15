@@ -1,7 +1,7 @@
 bl_info = {
     "name": "Gamepad Controls",
     "author": "OhMyKing",
-    "version": (1, 0),
+    "version": (1, 1),
     "blender": (3, 0, 0),
     "location": "View3D > Sidebar > Gamepad",
     "description": "Control Blender with a gamepad",
@@ -15,13 +15,18 @@ import time
 from bpy.types import Operator, Panel, PropertyGroup
 from bpy.props import FloatProperty, PointerProperty, BoolProperty
 
-try:
-    from inputs import get_gamepad
-    GAMEPAD_AVAILABLE = True
-except ImportError:
-    GAMEPAD_AVAILABLE = False
+# 动态检测函数
+def check_gamepad_available():
+    try:
+        from inputs import get_gamepad
+        # 尝试获取手柄事件，如果没有手柄会抛出异常
+        events = get_gamepad()
+        return True
+    except:
+        return False
 
 from bpy_extras import view3d_utils
+
 
 # 手柄状态类
 class GamepadState:
@@ -46,19 +51,42 @@ class GamepadThread(threading.Thread):
         self.daemon = True
         self.running = True
         self.error_message = None
+        self._consecutive_errors = 0  # 添加连续错误计数器
+        self._max_consecutive_errors = 10  # 最大连续错误次数
 
     def run(self):
-        while self.running and GAMEPAD_AVAILABLE:
+        while self.running:
             try:
+                from inputs import get_gamepad
                 events = get_gamepad()
+                # 成功获取事件，重置错误计数
+                self._consecutive_errors = 0
+                self.error_message = None
+
                 for event in events:
-                    self.process_event(event)
-            except Exception as e:
-                self.error_message = f"手柄错误: {e}"
-                print(self.error_message)
+                    if self.running:  # 检查是否仍在运行
+                        self.process_event(event)
+
+            except ImportError:
+                self.error_message = "未安装 'inputs' 包。请安装后重试。"
+                self._consecutive_errors += 1
                 time.sleep(1)
 
+            except Exception as e:
+                self._consecutive_errors += 1
+                if "No gamepad found" in str(e):
+                    self.error_message = "未检测到手柄。请确保手柄已连接。"
+                else:
+                    self.error_message = f"手柄错误: {e}"
+                time.sleep(0.5)  # 减少等待时间，提高响应速度
+
+            # 如果连续错误次数过多，可能需要关闭控制
+            if self._consecutive_errors >= self._max_consecutive_errors:
+                self.error_message = "多次无法检测到手柄，已自动关闭控制。"
+                break
+
     def process_event(self, event):
+        """处理手柄事件"""
         if event.code == 'ABS_X':
             gamepad_state.left_stick_x = event.state / 32768.0
         elif event.code == 'ABS_Y':
@@ -165,6 +193,7 @@ class GamepadSettings(PropertyGroup):
         update=update_enable_gamepad_control
     )
 
+
 # 主操作器
 class GAMEPAD_OT_control(Operator):
     bl_idname = "gamepad.control"
@@ -173,17 +202,44 @@ class GAMEPAD_OT_control(Operator):
 
     _timer = None
     _thread = None
+    _last_error_time = 0  # 错误消息时间戳
+    _last_error_message = None  # 上一次错误消息
 
     def modal(self, context, event):
         settings = context.scene.gamepad_settings
+
+        # 检查线程状态
+        if self._thread:
+            if not self._thread.is_alive():
+                # 线程已结束，说明发生了严重错误
+                settings.enable_gamepad_control = False
+                self.report({'WARNING'}, "手柄控制已自动关闭")
+                self.cancel(context)
+                return {'CANCELLED'}
+
+            # 检查错误信息
+            if self._thread.error_message:
+                current_time = time.time()
+                # 如果是新的错误消息或者距离上次显示超过3秒
+                if (self._thread.error_message != self._last_error_message or
+                        current_time - self._last_error_time > 3):
+                    self.report({'WARNING'}, self._thread.error_message)
+                    self._last_error_time = current_time
+                    self._last_error_message = self._thread.error_message
+
+                # 如果提示自动关闭控制，则关闭
+                if "已自动关闭控制" in self._thread.error_message:
+                    settings.enable_gamepad_control = False
+                    self.cancel(context)
+                    return {'CANCELLED'}
+
+                # 如果提示未安装包，则关闭
+                if "未安装 'inputs' 包" in self._thread.error_message:
+                    settings.enable_gamepad_control = False
+                    self.cancel(context)
+                    return {'CANCELLED'}
+
         if not settings.enable_gamepad_control:
-            self.cancel(context)
-            return {'CANCELLED'}
-        
-        # 检查手柄线程中的错误信息
-        if self._thread and self._thread.error_message:
-            self.report({'ERROR'}, self._thread.error_message)
-            settings.enable_gamepad_control = False
             self.cancel(context)
             return {'CANCELLED'}
 
@@ -285,7 +341,7 @@ class GAMEPAD_OT_control(Operator):
 
             context.area.tag_redraw()
 
-            return {'PASS_THROUGH'}
+            return {'RUNNING_MODAL'}  # 改为 RUNNING_MODAL 以确保持续运行
 
         elif event.type == 'ESC':
             self.cancel(context)
@@ -334,19 +390,21 @@ class GAMEPAD_OT_control(Operator):
                 self.report({'WARNING'}, f"操作失败: {str(e)}")
 
     def execute(self, context):
-        if not GAMEPAD_AVAILABLE:
-            self.report({'ERROR'}, "未检测到手柄支持。请安装 'inputs' 包。")
-            return {'CANCELLED'}
-
         if context.area.type != 'VIEW_3D':
             self.report({'WARNING'}, "激活区域必须是3D视图")
             return {'CANCELLED'}
 
+        # 重置手柄状态
+        global gamepad_state
+        gamepad_state = GamepadState()
+
+        # 开始新线程
         self._thread = GamepadThread()
         self._thread.start()
 
+        # 设置计时器
         wm = context.window_manager
-        self._timer = wm.event_timer_add(1/60, window=context.window)
+        self._timer = wm.event_timer_add(1 / 60, window=context.window)
         wm.modal_handler_add(self)
 
         return {'RUNNING_MODAL'}
@@ -356,7 +414,12 @@ class GAMEPAD_OT_control(Operator):
             context.window_manager.event_timer_remove(self._timer)
         if self._thread:
             self._thread.running = False
-            self._thread.join()
+            self._thread.join(timeout=1.0)  # 添加超时
+
+        # 重置手柄状态
+        global gamepad_state
+        gamepad_state = GamepadState()
+
 
 # UI 面板
 class GAMEPAD_PT_panel(Panel):
@@ -366,24 +429,64 @@ class GAMEPAD_PT_panel(Panel):
     bl_region_type = 'UI'
     bl_category = 'Gamepad'
 
+    @classmethod
+    def poll(cls, context):
+        return context.area.type == 'VIEW_3D'
+
+    def check_inputs_package(self):
+        try:
+            import inputs
+            return True
+        except ImportError:
+            return False
+
     def draw(self, context):
         layout = self.layout
         settings = context.scene.gamepad_settings
 
-        layout.prop(settings, "enable_gamepad_control")
+        box = layout.box()
+        row = box.row()
+        row.prop(settings, "enable_gamepad_control")
 
-        if not GAMEPAD_AVAILABLE:
-            layout.label(text="请安装 'inputs' 包", icon='ERROR')
-        else:
-            layout.prop(settings, "pan_speed")
-            layout.prop(settings, "rotation_speed")
-            layout.prop(settings, "zoom_speed")
-            layout.prop(settings, "scale_speed")
-            layout.prop(settings, "move_speed")
-            layout.prop(settings, "object_rotation_speed")
-            layout.prop(settings, "invert_x_axis")
-            layout.prop(settings, "invert_y_axis")
-            layout.prop(settings, "invert_z_axis")
+        # 检查 inputs 包是否安装
+        inputs_available = self.check_inputs_package()
+
+        if not inputs_available:
+            box.label(text="请安装 'inputs' 包", icon='ERROR')
+            box.label(text="pip install inputs", icon='CONSOLE')
+            return
+
+        # 如果 inputs 包已安装，显示其他设置
+        if settings.enable_gamepad_control:
+            box = layout.box()
+            box.label(text="视角控制设置:", icon='VIEW3D')
+            box.prop(settings, "pan_speed")
+            box.prop(settings, "rotation_speed")
+            box.prop(settings, "zoom_speed")
+
+            box = layout.box()
+            box.label(text="物体控制设置:", icon='OBJECT_DATA')
+            box.prop(settings, "scale_speed")
+            box.prop(settings, "move_speed")
+            box.prop(settings, "object_rotation_speed")
+
+            box = layout.box()
+            box.label(text="轴向设置:", icon='ORIENTATION_GIMBAL')
+            box.prop(settings, "invert_x_axis")
+            box.prop(settings, "invert_y_axis")
+            box.prop(settings, "invert_z_axis")
+
+            # 添加控制说明
+            help_box = layout.box()
+            help_box.label(text="控制说明:", icon='HELP')
+            col = help_box.column(align=True)
+            col.label(text="左摇杆: 平移/物体移动")
+            col.label(text="右摇杆: 旋转")
+            col.label(text="A键(BTN_SOUTH): 放大/缩小")
+            col.label(text="B键(BTN_EAST): 缩小/放大")
+            col.label(text="X键(BTN_WEST): 撤销")
+            col.label(text="Y键(BTN_NORTH): 重做")
+            col.label(text="方向键: 切换视图")
 
 classes = (
     GamepadSettings,
@@ -391,15 +494,54 @@ classes = (
     GAMEPAD_PT_panel,
 )
 
+
+def safe_register():
+    """安全注册所有类"""
+    try:
+        # 注册属性组
+        if not hasattr(bpy.types.Scene, "gamepad_settings"):
+            bpy.utils.register_class(GamepadSettings)
+            bpy.types.Scene.gamepad_settings = PointerProperty(type=GamepadSettings)
+
+        # 注册操作器和面板
+        bpy.utils.register_class(GAMEPAD_OT_control)
+        bpy.utils.register_class(GAMEPAD_PT_panel)
+
+        return True
+    except Exception as e:
+        print(f"游戏手柄插件注册失败: {str(e)}")
+        return False
+
+
+def safe_unregister():
+    """安全注销所有类"""
+    try:
+        # 注销操作器和面板
+        bpy.utils.unregister_class(GAMEPAD_PT_panel)
+        bpy.utils.unregister_class(GAMEPAD_OT_control)
+
+        # 注销属性组
+        if hasattr(bpy.types.Scene, "gamepad_settings"):
+            bpy.utils.unregister_class(GamepadSettings)
+            del bpy.types.Scene.gamepad_settings
+
+    except Exception as e:
+        print(f"游戏手柄插件注销失败: {str(e)}")
+
+
 def register():
-    for cls in classes:
-        bpy.utils.register_class(cls)
-    bpy.types.Scene.gamepad_settings = PointerProperty(type=GamepadSettings)
+    """插件注册入口点"""
+    if not safe_register():
+        # 如果注册失败，确保完全清理
+        safe_unregister()
+        return {'CANCELLED'}
+    return {'FINISHED'}
+
 
 def unregister():
-    for cls in classes:
-        bpy.utils.unregister_class(cls)
-    del bpy.types.Scene.gamepad_settings
+    """插件注销入口点"""
+    safe_unregister()
+
 
 if __name__ == "__main__":
     register()
