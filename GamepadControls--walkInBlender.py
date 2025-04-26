@@ -14,6 +14,7 @@ import threading
 import time
 from bpy.types import Operator, Panel, PropertyGroup
 from bpy.props import FloatProperty, PointerProperty, BoolProperty
+import math
 
 # 动态检测函数
 def check_gamepad_available():
@@ -262,12 +263,17 @@ class GAMEPAD_OT_control(Operator):
                     if not settings.invert_y_axis:
                         dy = -dy
 
-                    move_vector = mathutils.Vector((dx, dy, 0.0))
-                    move_vector = view3d.view_rotation @ move_vector
-                    obj.location += move_vector
+					//20250426 casdfxx : use local euler view 
+                    obj.location.x += -1*dy*math.sin((obj.rotation_euler[2]))
+                    obj.location.y +=    dy*math.cos((obj.rotation_euler[2]))
+
+                    obj.location.y += dx*math.sin(obj.rotation_euler[2])
+                    obj.location.x += dx*math.cos(obj.rotation_euler[2])
+
 
                     obj.location = obj.location.copy()
-                    obj.keyframe_insert(data_path='location', group="Location")
+                    obj.keyframe_insert(data_path='delta_location', group="Location")
+
 
                 if abs(gamepad_state.right_stick_x) > 0.1 or abs(gamepad_state.right_stick_y) > 0.1:
                     rot_speed = settings.object_rotation_speed
@@ -280,8 +286,11 @@ class GAMEPAD_OT_control(Operator):
                     if settings.invert_z_axis:
                         delta_rot_z = -delta_rot_z
 
-                    rot_euler = mathutils.Euler((delta_rot_x, 0, delta_rot_z), 'XYZ')
+					//20250426 casdfxx : only rotate z aixs
+                    #rot_euler = mathutils.Euler((delta_rot_x, 0, delta_rot_z), 'XYZ')
+                    rot_euler = mathutils.Euler((0, 0, delta_rot_z), 'XYZ')
                     obj.rotation_euler.rotate(rot_euler)
+                    
 
                     obj.rotation_euler = obj.rotation_euler.copy()
                     obj.keyframe_insert(data_path='rotation_euler', group="Rotation")
