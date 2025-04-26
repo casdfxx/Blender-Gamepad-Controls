@@ -119,3 +119,51 @@
 
 - 提交Issue：发现bug或有新功能建议
 - 提交PR：直接贡献代码
+
+
+# ********************************************************************************
+# ********************************************************************************
+# ********************************************************************************
+
+捣鼓一天了，各种坑，感谢楼主，感谢互联网，记录下状态，人多就出详细教程，可能会更到csdn上。
+
+## 将该版本改为游戏手柄控制摄像头移动和旋转。
+组合为 steamVR，phoneVR，Blender，御游Plus。
+实现以虚拟视角，在blender世界里闲逛。因为blender实时渲染，可以躺在床上，将phoneVR手机戴到
+头上，控制角度，用手柄左摇杆控制前后移动，右摇杆也能控制视角，只能左右转。目前只测试过一个手柄-
+-----御游plus，蓝牙连接（手柄涨价了，还是从一个上学的老哥手上淘来的。为什么不要了呢，说是女友不要了，不爱
+玩双人成行。。。。）
+
+这么做有什么意义呢？如果我说，是为了留下心中的美好，这样够不够。
+![blender界面拍照](assets/blender.png)
+![blender界面拍照](assets/blender2.png)
+![VR眼镜--手机截图](assets/phone.jpg)
+![御游plus](assets/env.jpg)
+
+## 重要的事情说三遍！！！
+## 重要的事情说三遍！！！
+## 重要的事情说三遍！！！
+要将御游plus转为xbox状态，不然边接不上。
+
+
+
+
+It's been a day of tinkering.,All kinds of pits.,Thanks to the landlord.,Thanks to the Internet.,Record the status.,There are more people on the detailed tutorial.,Maybe more to CSDN.。
+
+## Changed this version to a gamepad to control camera movement and rotation.
+The combination is steamVR, phoneVR, Blender, Yuyou Plus.
+Wander around the world of Blender virtually. Because blender renders in real time, you can lie on the bed and wear your phoneVR phone
+On the head, control the angle, use the left joystick of the handle to control the forward and backward movement, and the right joystick can also control the viewing angle, which can only be turned left and right. I've only tested one handle so far-
+----- Yuyou plus, Bluetooth connection (the price of the handle has risen, or from a school-going brother.) Why don't you want it, say that your girlfriend doesn't want it, you don't love it
+Play in pairs... ）
+
+What's the point? If I say that it is to leave the good in my heart, is this enough?
+! [Blender screen photo] (assets/blender.png)
+! [Blender screen photo] (assets/blender2.png)
+! [VR glasses - mobile phone screenshot] (assets/phone.jpg)
+! [Imperial Tour Plus] (assets/env.jpg)
+
+## Say the important thing three times!!
+## Say the important thing three times!!
+## Say the important thing three times!!
+You have to turn Yuyou Plus to Xbox status, otherwise you won't be able to connect to the side.
